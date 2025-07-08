@@ -1,0 +1,492 @@
+# models.py
+from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
+from datetime import datetime
+import uuid
+
+db = SQLAlchemy()
+bcrypt = Bcrypt()
+
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    
+    # Enhanced user profile fields
+    name = db.Column(db.String(100), nullable=True)
+    role = db.Column(db.String(50), nullable=True)  # admin, engineer, technician, etc.
+    department = db.Column(db.String(100), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def set_password(self, password):
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password_hash, password)
+    
+    def update_last_login(self):
+        """Update the last login timestamp"""
+        self.last_login = datetime.utcnow()
+        db.session.commit()
+    
+    def to_dict(self, include_sensitive=False):
+        result = {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'name': self.name,
+            'role': self.role,
+            'department': self.department,
+            'phone': self.phone,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+        if include_sensitive:
+            result['password_hash'] = self.password_hash
+        
+        return result
+
+class Anomaly(db.Model):
+    __tablename__ = 'anomalies'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Basic anomaly information
+    title = db.Column(db.String(200), nullable=False)  # Human-readable title
+    description = db.Column(db.Text, nullable=False)
+    num_equipement = db.Column(db.String(50), nullable=False)  # Equipment ID
+    systeme = db.Column(db.String(50), nullable=False)  # System type
+    equipment_id = db.Column(db.String(100), nullable=True)  # Additional equipment reference
+    service = db.Column(db.String(100), nullable=True)  # Service department
+    responsible_person = db.Column(db.String(100), nullable=True)  # Person responsible
+    status = db.Column(db.String(20), default='open', nullable=False)  # open, in_progress, resolved, closed
+    origin_source = db.Column(db.String(50), nullable=True)  # inspection, maintenance, operation, etc.
+    
+    # Original fields for compatibility
+    date_detection = db.Column(db.DateTime, nullable=False)
+    description_equipement = db.Column(db.String(255), nullable=False)
+    section_proprietaire = db.Column(db.String(10), nullable=False)
+    
+    # AI prediction scores
+    fiabilite_score = db.Column(db.Float, nullable=True)
+    integrite_score = db.Column(db.Float, nullable=True)
+    disponibilite_score = db.Column(db.Float, nullable=True)
+    process_safety_score = db.Column(db.Float, nullable=True)
+    criticality_level = db.Column(db.Float, nullable=True)
+    
+    # User override scores
+    user_fiabilite_score = db.Column(db.Float, nullable=True)
+    user_integrite_score = db.Column(db.Float, nullable=True)
+    user_disponibilite_score = db.Column(db.Float, nullable=True)
+    user_process_safety_score = db.Column(db.Float, nullable=True)
+    user_criticality_level = db.Column(db.Float, nullable=True)
+    use_user_scores = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Planning and maintenance
+    estimated_hours = db.Column(db.Float, nullable=True)
+    priority = db.Column(db.String(20), nullable=True)  # low, medium, high, critical
+    maintenance_window_id = db.Column(db.Integer, db.ForeignKey('maintenance_windows.id'), nullable=True)
+    
+    # Approval status and tracking
+    is_approved = db.Column(db.Boolean, default=False, nullable=False)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    approved_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Metadata - track who created and last updated
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    last_modified_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    last_modified_at = db.Column(db.DateTime, nullable=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    approved_by = db.relationship('User', foreign_keys=[approved_by_user_id], backref='approved_anomalies')
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref='created_anomalies')
+    updated_by = db.relationship('User', foreign_keys=[updated_by_user_id], backref='updated_anomalies')
+    last_modified_by_user = db.relationship('User', foreign_keys=[last_modified_by], backref='last_modified_anomalies')
+    maintenance_window = db.relationship('MaintenanceWindow', backref='scheduled_anomalies')
+    
+    def get_active_scores(self):
+        """Get the currently active scores (user override or AI prediction)"""
+        if self.use_user_scores:
+            return {
+                'fiabilite_integrite': self.user_fiabilite_score,
+                'disponibilite': self.user_disponibilite_score,
+                'process_safety': self.user_process_safety_score,
+                'criticite': self.user_criticality_level
+            }
+        else:
+            return {
+                'fiabilite_integrite': self.fiabilite_score,
+                'disponibilite': self.disponibilite_score,
+                'process_safety': self.process_safety_score,
+                'criticite': self.criticality_level
+            }
+    
+    def to_dict(self):
+        active_scores = self.get_active_scores()
+        
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'num_equipement': self.num_equipement,
+            'systeme': self.systeme,
+            'equipment_id': self.equipment_id,
+            'service': self.service,
+            'responsible_person': self.responsible_person,
+            'status': self.status,
+            'origin_source': self.origin_source,
+            'date_detection': self.date_detection.isoformat() if self.date_detection else None,
+            'description_equipement': self.description_equipement,
+            'section_proprietaire': self.section_proprietaire,
+            'ai_predictions': {
+                'fiabilite_score': self.fiabilite_score,
+                'integrite_score': self.integrite_score,
+                'disponibilite_score': self.disponibilite_score,
+                'process_safety_score': self.process_safety_score,
+                'criticality_level': self.criticality_level
+            },
+            'user_overrides': {
+                'fiabilite_score': self.user_fiabilite_score,
+                'integrite_score': self.user_integrite_score,
+                'disponibilite_score': self.user_disponibilite_score,
+                'process_safety_score': self.user_process_safety_score,
+                'criticality_level': self.user_criticality_level,
+                'use_user_scores': self.use_user_scores
+            },
+            'active_scores': active_scores,
+            'estimated_hours': self.estimated_hours,
+            'priority': self.priority,
+            'maintenance_window_id': self.maintenance_window_id,
+            'is_approved': self.is_approved,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
+            'approved_by_user_id': self.approved_by_user_id,
+            'created_by_user_id': self.created_by_user_id,
+            'updated_by_user_id': self.updated_by_user_id,
+            'last_modified_by': self.last_modified_by,
+            'last_modified_at': self.last_modified_at.isoformat() if self.last_modified_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def update_predictions(self, predictions):
+        """Update the AI prediction values (backward compatibility)"""
+        if isinstance(predictions, dict):
+            self.fiabilite_score = float(predictions.get('Fiabilité Intégrité', 0))
+            self.disponibilite_score = float(predictions.get('Disponibilité', 0))
+            self.process_safety_score = float(predictions.get('Process Safety', 0))
+            # Criticality is the sum of all three scores
+            self.criticality_level = self.fiabilite_score + self.disponibilite_score + self.process_safety_score
+        else:
+            # Legacy array format
+            self.fiabilite_score = float(predictions[0])
+            self.disponibilite_score = float(predictions[1])
+            self.process_safety_score = float(predictions[2])
+            self.criticality_level = float(predictions[0]) + float(predictions[1]) + float(predictions[2])
+        
+        self.updated_at = datetime.utcnow()
+        # Reset approval when predictions are updated
+        self.is_approved = False
+        self.approved_at = None
+        self.use_user_scores = False  # Use AI scores by default
+    
+    def approve_predictions(self, user_id):
+        """Mark predictions as approved"""
+        self.is_approved = True
+        self.approved_at = datetime.utcnow()
+        self.approved_by_user_id = user_id
+        self.updated_at = datetime.utcnow()
+        self.updated_by_user_id = user_id
+        self.last_modified_by = user_id
+        self.last_modified_at = datetime.utcnow()
+    
+    def update_manual_predictions(self, user_id, fiabilite_score=None, disponibilite_score=None, 
+                                process_safety_score=None, criticality_level=None):
+        """Update predictions manually and mark as approved"""
+        if fiabilite_score is not None:
+            self.user_fiabilite_score = float(fiabilite_score)
+        if disponibilite_score is not None:
+            self.user_disponibilite_score = float(disponibilite_score)
+        if process_safety_score is not None:
+            self.user_process_safety_score = float(process_safety_score)
+        if criticality_level is not None:
+            self.user_criticality_level = float(criticality_level)
+        else:
+            # Recalculate criticality if not provided
+            if all(x is not None for x in [self.user_fiabilite_score, self.user_disponibilite_score, self.user_process_safety_score]):
+                self.user_criticality_level = self.user_fiabilite_score + self.user_disponibilite_score + self.user_process_safety_score
+        
+        # Mark to use user scores and approve
+        self.use_user_scores = True
+        self.is_approved = True
+        self.approved_at = datetime.utcnow()
+        self.approved_by_user_id = user_id
+        self.updated_at = datetime.utcnow()
+        self.updated_by_user_id = user_id
+        self.last_modified_by = user_id
+        self.last_modified_at = datetime.utcnow()
+    
+    # Backward compatibility properties
+    @property
+    def fiabilite_integrite(self):
+        """Backward compatibility property"""
+        return self.user_fiabilite_score if self.use_user_scores else self.fiabilite_score
+    
+    @fiabilite_integrite.setter
+    def fiabilite_integrite(self, value):
+        """Backward compatibility setter"""
+        if self.use_user_scores:
+            self.user_fiabilite_score = value
+        else:
+            self.fiabilite_score = value
+    
+    @property
+    def disponibilite(self):
+        """Backward compatibility property"""
+        return self.user_disponibilite_score if self.use_user_scores else self.disponibilite_score
+    
+    @disponibilite.setter
+    def disponibilite(self, value):
+        """Backward compatibility setter"""
+        if self.use_user_scores:
+            self.user_disponibilite_score = value
+        else:
+            self.disponibilite_score = value
+    
+    @property
+    def process_safety(self):
+        """Backward compatibility property"""
+        return self.user_process_safety_score if self.use_user_scores else self.process_safety_score
+    
+    @process_safety.setter
+    def process_safety(self, value):
+        """Backward compatibility setter"""
+        if self.use_user_scores:
+            self.user_process_safety_score = value
+        else:
+            self.process_safety_score = value
+    
+    @property
+    def criticite(self):
+        """Backward compatibility property"""
+        return self.user_criticality_level if self.use_user_scores else self.criticality_level
+    
+    @criticite.setter
+    def criticite(self, value):
+        """Backward compatibility setter"""
+        if self.use_user_scores:
+            self.user_criticality_level = value
+        else:
+            self.criticality_level = value
+
+class MaintenanceWindow(db.Model):
+    __tablename__ = 'maintenance_windows'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(50), nullable=False)  # planned, emergency, routine
+    duration_days = db.Column(db.Integer, nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='scheduled', nullable=False)  # scheduled, in_progress, completed, cancelled
+    
+    # Metadata
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref='created_maintenance_windows')
+    updated_by = db.relationship('User', foreign_keys=[updated_by_user_id], backref='updated_maintenance_windows')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.type,
+            'duration_days': self.duration_days,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'description': self.description,
+            'status': self.status,
+            'created_by_user_id': self.created_by_user_id,
+            'updated_by_user_id': self.updated_by_user_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'scheduled_anomalies_count': len(self.scheduled_anomalies)
+        }
+
+
+class ActionPlan(db.Model):
+    __tablename__ = 'action_plans'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    anomaly_id = db.Column(db.Integer, db.ForeignKey('anomalies.id'), nullable=False, unique=True)
+    
+    # Planning details
+    needs_outage = db.Column(db.Boolean, default=False, nullable=False)
+    outage_type = db.Column(db.String(50), nullable=True)  # planned, emergency
+    outage_duration = db.Column(db.Integer, nullable=True)  # in hours
+    planned_date = db.Column(db.DateTime, nullable=True)
+    total_duration_hours = db.Column(db.Float, nullable=True)
+    total_duration_days = db.Column(db.Float, nullable=True)
+    estimated_cost = db.Column(db.Float, nullable=True)
+    priority = db.Column(db.String(20), nullable=True)  # low, medium, high, critical
+    comments = db.Column(db.Text, nullable=True)
+    
+    # Status tracking
+    status = db.Column(db.String(20), default='draft', nullable=False)  # draft, approved, in_progress, completed
+    
+    # Metadata
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    approved_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    anomaly = db.relationship('Anomaly', backref=db.backref('action_plan', uselist=False))
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref='created_action_plans')
+    updated_by = db.relationship('User', foreign_keys=[updated_by_user_id], backref='updated_action_plans')
+    approved_by = db.relationship('User', foreign_keys=[approved_by_user_id], backref='approved_action_plans')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'anomaly_id': self.anomaly_id,
+            'needs_outage': self.needs_outage,
+            'outage_type': self.outage_type,
+            'outage_duration': self.outage_duration,
+            'planned_date': self.planned_date.isoformat() if self.planned_date else None,
+            'total_duration_hours': self.total_duration_hours,
+            'total_duration_days': self.total_duration_days,
+            'estimated_cost': self.estimated_cost,
+            'priority': self.priority,
+            'comments': self.comments,
+            'status': self.status,
+            'created_by_user_id': self.created_by_user_id,
+            'updated_by_user_id': self.updated_by_user_id,
+            'approved_by_user_id': self.approved_by_user_id,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'action_items': [item.to_dict() for item in self.action_items]
+        }
+
+
+class ActionItem(db.Model):
+    __tablename__ = 'action_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    action_plan_id = db.Column(db.Integer, db.ForeignKey('action_plans.id'), nullable=False)
+    
+    # Action details
+    action = db.Column(db.Text, nullable=False)
+    responsable = db.Column(db.String(100), nullable=True)
+    pdrs_disponible = db.Column(db.Boolean, default=True, nullable=False)  # Parts/pieces available
+    ressources_internes = db.Column(db.String(200), nullable=True)  # Internal resources
+    ressources_externes = db.Column(db.String(200), nullable=True)  # External resources
+    statut = db.Column(db.String(20), default='pending', nullable=False)  # pending, in_progress, completed, blocked
+    duree_heures = db.Column(db.Float, nullable=True)  # Duration in hours
+    duree_jours = db.Column(db.Float, nullable=True)  # Duration in days
+    
+    # Metadata
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    action_plan = db.relationship('ActionPlan', backref='action_items')
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref='created_action_items')
+    updated_by = db.relationship('User', foreign_keys=[updated_by_user_id], backref='updated_action_items')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'action_plan_id': self.action_plan_id,
+            'action': self.action,
+            'responsable': self.responsable,
+            'pdrs_disponible': self.pdrs_disponible,
+            'ressources_internes': self.ressources_internes,
+            'ressources_externes': self.ressources_externes,
+            'statut': self.statut,
+            'duree_heures': self.duree_heures,
+            'duree_jours': self.duree_jours,
+            'created_by_user_id': self.created_by_user_id,
+            'updated_by_user_id': self.updated_by_user_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+# Helper functions for backward compatibility and easier database operations
+class UserDatabase:
+    @staticmethod
+    def create_user(username, email, password, name=None, role=None, department=None, phone=None):
+        # Check if user already exists
+        if User.query.filter((User.username == username) | (User.email == email)).first():
+            return None
+        
+        user = User(
+            username=username, 
+            email=email,
+            name=name,
+            role=role,
+            department=department,
+            phone=phone
+        )
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        return user
+    
+    @staticmethod
+    def get_user_by_username(username):
+        return User.query.filter_by(username=username).first()
+    
+    @staticmethod
+    def get_user_by_email(email):
+        return User.query.filter_by(email=email).first()
+    
+    @staticmethod
+    def get_user_by_id(user_id):
+        return User.query.get(user_id)
+    
+    @staticmethod
+    def verify_password(user, password):
+        return user.check_password(password)
+    
+    @staticmethod
+    def update_user_profile(user_id, **kwargs):
+        """Update user profile with given fields"""
+        user = User.query.get(user_id)
+        if not user:
+            return None
+        
+        allowed_fields = ['name', 'role', 'department', 'phone', 'email']
+        for field, value in kwargs.items():
+            if field in allowed_fields and hasattr(user, field):
+                setattr(user, field, value)
+        
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+        return user
+
+# Global database instance for backward compatibility
+user_db = UserDatabase()

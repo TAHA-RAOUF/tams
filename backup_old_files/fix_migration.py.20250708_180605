@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""
+Complete migration script to fix the project structure migration
+This script will run all necessary steps to complete the migration.
+"""
+
+import os
+import subprocess
+import sys
+import time
+
+def run_script(script_name, description):
+    """Run a Python script and display output"""
+    print(f"\n\033[1;34m{description}...\033[0m")
+    print("-" * 80)
+    
+    try:
+        # Use subprocess to run the script and capture output
+        if os.path.exists(script_name):
+            result = subprocess.run(['python', script_name], 
+                                    capture_output=True, 
+                                    text=True, 
+                                    check=True)
+            print(result.stdout)
+            if result.stderr:
+                print(f"\033[1;33mWarnings/Errors:\033[0m\n{result.stderr}")
+            print(f"\033[1;32mCompleted {script_name} successfully\033[0m")
+            return True
+        else:
+            print(f"\033[1;31mError: Script {script_name} not found\033[0m")
+            return False
+    except subprocess.CalledProcessError as e:
+        print(f"\033[1;31mError running {script_name}:\033[0m")
+        print(e.stderr)
+        return False
+
+def check_missing_files(file_mapping):
+    """Check which files still need to be migrated"""
+    missing_files = []
+    
+    for dest_path in file_mapping.values():
+        if not os.path.exists(dest_path) and dest_path.endswith('.py'):
+            missing_files.append(dest_path)
+    
+    return missing_files
+
+def print_status():
+    """Print the current migration status"""
+    from migrate_structure import FILE_MAPPINGS
+    
+    print("\n\033[1;34mChecking migration status...\033[0m")
+    print("-" * 80)
+    
+    missing = check_missing_files(FILE_MAPPINGS)
+    
+    if missing:
+        print(f"\033[1;33mFiles that still need to be migrated ({len(missing)}):\033[0m")
+        for file in missing:
+            print(f"  - {file}")
+    else:
+        print("\033[1;32mAll files have been successfully migrated!\033[0m")
+    
+    # Check if required directories exist
+    required_dirs = [
+        'app/api/v1/endpoints',
+        'app/core',
+        'app/models',
+        'app/utils',
+        'app/templates',
+        'app/static',
+    ]
+    
+    missing_dirs = []
+    for d in required_dirs:
+        if not os.path.exists(d):
+            missing_dirs.append(d)
+    
+    if missing_dirs:
+        print(f"\n\033[1;33mDirectories that still need to be created ({len(missing_dirs)}):\033[0m")
+        for d in missing_dirs:
+            print(f"  - {d}")
+
+def main():
+    """Main function to run the migration process"""
+    print("\033[1;32m" + "=" * 80 + "\033[0m")
+    print("\033[1;32m TAMS Project Structure Migration Fix \033[0m")
+    print("\033[1;32m" + "=" * 80 + "\033[0m")
+    
+    # Change to project root directory
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    
+    # Step 1: Run the main structure migration
+    if not run_script('migrate_structure.py', "Running structure migration"):
+        print("\033[1;31mStructure migration failed. Aborting.\033[0m")
+        return
+    
+    # Step 2: Run the models migration
+    if not run_script('scripts/migrate_models.py', "Running models migration"):
+        print("\033[1;31mModels migration script failed. Continuing anyway...\033[0m")
+    
+    # Check status
+    print_status()
+    
+    print("\n\033[1;32m" + "=" * 80 + "\033[0m")
+    print("\033[1;32m Migration process completed \033[0m")
+    print("\033[1;32m" + "=" * 80 + "\033[0m")
+    
+    print("\nNext steps:")
+    print("1. Check the output above for any missing files or directories")
+    print("2. If there are missing files, you may need to manually create them")
+    print("3. Test the application to ensure it works correctly")
+    print("4. Update any remaining import statements that might still refer to old paths")
+    print("5. Consider removing the old files once everything is working")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,112 @@
+get:
+  tags:
+    - Anomaly Prediction
+  summary: Get API information
+  description: Get API information and available endpoints
+  responses:
+    200:
+      description: API information
+      schema:
+        type: object
+        properties:
+          message:
+            type: string
+            example: "Anomaly Prediction API"
+          endpoints:
+            type: object
+            properties:
+              predict:
+                type: string
+                example: "POST /predict - Single anomaly prediction"
+              predict_batch:
+                type: string
+                example: "POST /predict-batch - Batch anomaly prediction"
+              predict_file:
+                type: string
+                example: "POST /predict-file - File-based prediction"
+      examples:
+        application/json:
+          message: "Anomaly Prediction API"
+          endpoints:
+            predict: "POST /predict - Single anomaly prediction"
+            predict_batch: "POST /predict-batch - Batch anomaly prediction"
+            predict_file: "POST /predict-file - File-based prediction"
+---
+post:
+  tags:
+    - Anomaly Prediction
+  summary: Single Anomaly Prediction
+  description: Predict for a single anomaly
+  parameters:
+    - in: body
+      name: body
+      description: Single anomaly data
+      required: true
+      schema:
+        type: object
+        properties:
+          Systeme:
+            type: string
+            example: "System A"
+          Description de l'équipement:
+            type: string
+            example: "Equipment description"
+          Section propriétaire:
+            type: string
+            example: "Owner section"
+          Description:
+            type: string
+            example: "Anomaly description text"
+        required:
+          - Systeme
+          - Description de l'équipement
+          - Section propriétaire
+          - Description
+  responses:
+    200:
+      description: Successful prediction
+      schema:
+        type: object
+        properties:
+          prediction:
+            type: object
+            properties:
+              Fiabilité Intégrité:
+                type: number
+                example: 3.2
+              Disponibilté:
+                type: number
+                example: 2.8
+              Process Safety:
+                type: number
+                example: 1.5
+              Criticité:
+                type: number
+                example: 2.5
+      examples:
+        application/json:
+          prediction:
+            Fiabilité Intégrité: 3.2
+            Disponibilté: 2.8
+            Process Safety: 1.5
+            Criticité: 2.5
+    400:
+      description: Bad request - missing data
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "Missing required field: Description"
+    500:
+      description: Internal server error
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "Model prediction failed"

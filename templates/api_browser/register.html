@@ -1,0 +1,118 @@
+{% extends "api_browser/base.html" %}
+
+{% block content %}
+<div class="welcome-card">
+    <h1>👥 Register for TAQATHON API</h1>
+    <p>Create a new account to access all API endpoints and testing features.</p>
+</div>
+
+<div style="max-width: 400px; margin: 0 auto;">
+    <div class="feature-card">
+        <form method="POST" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label for="username" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Username:</label>
+                <input type="text" id="username" name="username" required 
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                       placeholder="Choose a unique username">
+                <small style="color: #6c757d;">Minimum 3 characters, alphanumeric and underscores only</small>
+            </div>
+            
+            <div>
+                <label for="email" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Email:</label>
+                <input type="email" id="email" name="email" required 
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                       placeholder="your.email@example.com">
+                <small style="color: #6c757d;">Valid email address required</small>
+            </div>
+            
+            <div>
+                <label for="password" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Password:</label>
+                <input type="password" id="password" name="password" required 
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                       placeholder="Enter a secure password">
+                <small style="color: #6c757d;">Minimum 6 characters required</small>
+            </div>
+            
+            <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;">
+                👥 Create Account
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+            <p>Already have an account? <a href="{{ url_for('browsable_api.auth_login') }}">Login here</a></p>
+        </div>
+    </div>
+</div>
+
+<div class="welcome-card" style="margin-top: 2rem;">
+    <h3>🛡️ Account Security</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <div>
+            <h4>✅ What you get:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>🔐 JWT-based authentication</li>
+                <li>🛡️ Secure password hashing</li>
+                <li>🎯 Access to all API endpoints</li>
+                <li>📊 Anomaly management features</li>
+                <li>🤖 ML prediction capabilities</li>
+                <li>📁 File upload support</li>
+                <li>🔄 Approval workflow access</li>
+                <li>👥 Team collaboration features</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📋 Requirements:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📝 <strong>Username:</strong> 3+ characters, unique</li>
+                <li>📧 <strong>Email:</strong> Valid email format</li>
+                <li>🔒 <strong>Password:</strong> 6+ characters minimum</li>
+                <li>✨ All fields are required</li>
+            </ul>
+            
+            <div class="code-block" style="margin-top: 1rem;">
+                <strong>Example:</strong><br>
+                Username: john_doe<br>
+                Email: john@company.com<br>
+                Password: mySecurePass123
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-focus on username field
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('username').focus();
+    
+    // Real-time validation feedback
+    const username = document.getElementById('username');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    
+    username.addEventListener('input', function() {
+        if (this.value.length >= 3) {
+            this.style.borderColor = '#28a745';
+        } else {
+            this.style.borderColor = '#dc3545';
+        }
+    });
+    
+    password.addEventListener('input', function() {
+        if (this.value.length >= 6) {
+            this.style.borderColor = '#28a745';
+        } else {
+            this.style.borderColor = '#dc3545';
+        }
+    });
+    
+    email.addEventListener('input', function() {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(this.value)) {
+            this.style.borderColor = '#28a745';
+        } else {
+            this.style.borderColor = '#dc3545';
+        }
+    });
+});
+</script>
+{% endblock %}

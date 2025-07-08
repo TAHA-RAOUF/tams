@@ -1,0 +1,181 @@
+{% extends "api_browser/base.html" %}
+
+{% block content %}
+<div class="welcome-card">
+    <h1>📋 API Endpoints</h1>
+    <p>Browse and test all available API endpoints. Click on any endpoint to open the interactive testing interface.</p>
+    
+    {% if current_user %}
+        <div class="auth-status authenticated">
+            ✅ <strong>Authenticated as {{ current_user.username }}</strong> - All endpoints are available for testing!
+        </div>
+    {% else %}
+        <div class="auth-status">
+            🔒 <strong>Authentication required</strong> - Please <a href="{{ url_for('browsable_api.login') }}">login</a> to test protected endpoints.
+        </div>
+    {% endif %}
+</div>
+
+<div style="display: grid; gap: 1.5rem;">
+    {% for endpoint_path, endpoint_info in endpoints.items() %}
+    <div class="feature-card">
+        <div style="display: flex; justify-content: between; align-items: flex-start; margin-bottom: 1rem;">
+            <div style="flex: 1;">
+                <h3 style="color: #007bff; margin-bottom: 0.5rem;">
+                    {{ endpoint_path }}
+                    {% if endpoint_info.requires_auth %}
+                        <span style="background: #ffc107; color: #212529; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-left: 0.5rem;">🔒 AUTH</span>
+                    {% endif %}
+                </h3>
+                <p style="color: #6c757d; margin-bottom: 1rem;">{{ endpoint_info.description }}</p>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+            {% for method in endpoint_info.methods %}
+                <span class="method-badge method-{{ method.lower() }}">{{ method }}</span>
+            {% endfor %}
+        </div>
+        
+        {% if endpoint_info.parameters %}
+        <div style="margin-bottom: 1rem;">
+            <h4 style="margin-bottom: 0.5rem; color: #495057;">Parameters:</h4>
+            <div class="code-block">
+                {% for param in endpoint_info.parameters %}
+                <div style="margin-bottom: 0.25rem;">
+                    <strong>{{ param.name }}</strong> 
+                    <span style="color: #6c757d;">({{ param.type }})</span>
+                    {% if param.required %}<span style="color: #dc3545;">*</span>{% endif %}
+                    {% if param.get('location') == 'path' %}<span style="color: #17a2b8;"> - URL parameter</span>{% endif %}
+                </div>
+                {% endfor %}
+                <div style="margin-top: 0.5rem; font-size: 0.875rem; color: #6c757d;">
+                    * Required parameter
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div style="display: flex; gap: 0.5rem;">
+            {% set clean_path = endpoint_path.replace('/api/v1/', '').replace('<id>', '1').replace('<', '').replace('>', '') %}
+            <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path=clean_path) }}" class="btn">
+                🧪 Test Endpoint
+            </a>
+            
+            {% if not current_user and endpoint_info.requires_auth %}
+                <a href="{{ url_for('browsable_api.login') }}" class="btn btn-secondary">
+                    🔑 Login Required
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="welcome-card" style="margin-top: 2rem;">
+    <h3>📖 API Reference</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
+        <div>
+            <h4>🔐 Authentication:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📝 <strong>POST /auth/register</strong> - Create account</li>
+                <li>🔑 <strong>POST /auth/login</strong> - Get JWT token</li>
+                <li>🚪 <strong>POST /auth/logout</strong> - Logout</li>
+                <li>👤 <strong>GET /auth/profile</strong> - Get user info</li>
+                <li>✏️ <strong>PUT /auth/profile</strong> - Update profile</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📊 Anomaly Management:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📋 <strong>GET /anomalies</strong> - List all anomalies</li>
+                <li>➕ <strong>POST /anomalies</strong> - Create anomaly</li>
+                <li>📝 <strong>PUT /anomalies/&lt;id&gt;</strong> - Update anomaly</li>
+                <li>🗑️ <strong>DELETE /anomalies/&lt;id&gt;</strong> - Delete anomaly</li>
+                <li>✅ <strong>POST /anomalies/&lt;id&gt;/approve</strong> - Approve</li>
+                <li>📊 <strong>PUT /anomalies/&lt;id&gt;/predictions</strong> - Edit predictions</li>
+                <li>🚦 <strong>PUT /anomalies/&lt;id&gt;/status</strong> - Update status</li>
+                <li>🔄 <strong>PUT /anomalies/bulk/status</strong> - Bulk status update</li>
+            </ul>
+        </div>
+        <div>
+            <h4>🤖 ML Predictions:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>🎯 <strong>POST /predict</strong> - Single prediction</li>
+                <li>📊 <strong>POST /predict-batch</strong> - Batch predict</li>
+                <li>📁 <strong>POST /predict-file</strong> - File upload</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📁 Batch & Import:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📊 <strong>POST /anomalies/batch</strong> - Bulk create</li>
+                <li>📤 <strong>POST /anomalies/upload</strong> - File upload</li>
+                <li>📥 <strong>POST /import/anomalies</strong> - Import file</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📅 Maintenance Windows:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📋 <strong>GET /maintenance-windows</strong> - List all</li>
+                <li>➕ <strong>POST /maintenance-windows</strong> - Create window</li>
+                <li>📝 <strong>PUT /maintenance-windows/&lt;id&gt;</strong> - Update</li>
+                <li>🗑️ <strong>DELETE /maintenance-windows/&lt;id&gt;</strong> - Delete</li>
+                <li>📌 <strong>POST /maintenance-windows/&lt;id&gt;/schedule-anomaly</strong> - Add anomaly</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📝 Action Plans:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📋 <strong>GET /action-plans/&lt;anomaly_id&gt;</strong> - Get plan</li>
+                <li>➕ <strong>POST /action-plans/&lt;anomaly_id&gt;</strong> - Create plan</li>
+                <li>� <strong>PUT /action-plans/&lt;anomaly_id&gt;</strong> - Update plan</li>
+                <li>➕ <strong>POST /action-plans/&lt;id&gt;/items</strong> - Add item</li>
+                <li>📝 <strong>PUT /action-plans/&lt;plan_id&gt;/items/&lt;item_id&gt;</strong> - Update item</li>
+                <li>🗑️ <strong>DELETE /action-plans/&lt;plan_id&gt;/items/&lt;item_id&gt;</strong> - Delete item</li>
+            </ul>
+        </div>
+        <div>
+            <h4>📈 Dashboard & Reports:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>📊 <strong>GET /dashboard/metrics</strong> - Key metrics</li>
+                <li>📊 <strong>GET /dashboard/charts/anomalies-by-month</strong> - Monthly chart</li>
+                <li>📊 <strong>GET /dashboard/charts/anomalies-by-service</strong> - Service chart</li>
+                <li>📊 <strong>GET /dashboard/charts/anomalies-by-criticality</strong> - Criticality chart</li>
+                <li>📊 <strong>GET /dashboard/charts/maintenance-windows</strong> - Timeline data</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+.method-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: white;
+}
+
+.method-get {
+    background: #28a745;
+}
+
+.method-post {
+    background: #007bff;
+}
+
+.method-put {
+    background: #ffc107;
+    color: #212529;
+}
+
+.method-delete {
+    background: #dc3545;
+}
+
+.method-patch {
+    background: #6f42c1;
+}
+</style>
+{% endblock %}

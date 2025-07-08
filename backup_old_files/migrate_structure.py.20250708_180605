@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""
+Migration script to help reorganize the project structure
+This script should be run from the project root to perform the migration.
+"""
+
+import os
+import shutil
+import re
+
+# Define the mapping of old files to new locations
+FILE_MAPPINGS = {
+    # API endpoints
+    "anomaly_api.py": "app/api/v1/endpoints/anomalies.py",
+    "anomaly_status_api.py": "app/api/v1/endpoints/status.py",
+    "maintenance_api.py": "app/api/v1/endpoints/maintenance.py", 
+    "auth.py": "app/api/v1/endpoints/auth.py",
+    "api.py": "app/api/v1/endpoints/predictions.py",
+    "dashboard_api.py": "app/api/v1/endpoints/dashboard.py",
+    "import_api.py": "app/api/v1/endpoints/import_data.py",
+    "action_plans_api.py": "app/api/v1/endpoints/action_plans.py",
+    
+    # Core functionality
+    "browsable_api.py": "app/core/browsable_api.py",
+    "predictor.py": "app/core/predictor.py",
+    
+    # Utilities
+    "enhanced_auth.py": "app/utils/enhanced_auth.py",
+    
+    # Scripts
+    "inspect_data.py": "scripts/inspect_data.py",
+    "inspect_model.py": "scripts/inspect_model.py",
+    "seed_database.py": "scripts/seed_database.py",
+    "init_db.py": "scripts/init_db.py",
+    
+    # Documentation and configuration
+    "README.md": "README.md",
+    "README_NEW.md": "README_NEW.md",
+    "requirements.txt": "requirements.txt",
+    "taqathon.pdf": "docs/taqathon.pdf",
+    "frontend_integration_guide.md": "docs/frontend_integration_guide.md",
+    "TODO.md": "TODO.md",
+    ".env": ".env",
+    ".gitignore": ".gitignore",
+    "run.sh": "scripts/run.sh",
+    "setup_and_seed.sh": "scripts/setup_and_seed.sh"
+}
+
+# Template directory mappings
+TEMPLATE_MAPPINGS = {
+    "templates": "app/templates"
+}
+
+# ML models directory mappings
+ML_MAPPINGS = {
+    "ml_models": "app/ml_models"
+}
+
+# Swagger specs directory mappings
+SWAGGER_MAPPINGS = {
+    "swagger_specs": "app/docs/swagger_specs"
+}
+
+def update_import_statements(file_path):
+    """Update import statements to reflect the new structure"""
+    
+    # Read the file content
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Define replacement patterns
+    replacements = [
+        # Fix model imports
+        (r'from app.models import (.*)', r'from app.models import \1'),
+        (r'from app.models import db, (.*)', r'from app.models import db, \1'),
+        (r'import app.models as models', r'import app.models as models'),
+        
+        # Update endpoint imports
+        (r'from app.api.v1.endpoints.auth import (.*)', r'from app.api.v1.endpoints.auth import \1'),
+        (r'from app.api.v1.endpoints.anomalies import (.*)', r'from app.api.v1.endpoints.anomalies import \1'),
+        (r'from app.api.v1.endpoints.status import (.*)', r'from app.api.v1.endpoints.status import \1'),
+        (r'from app.api.v1.endpoints.maintenance import (.*)', r'from app.api.v1.endpoints.maintenance import \1'),
+        (r'from app.api.v1.endpoints.dashboard import (.*)', r'from app.api.v1.endpoints.dashboard import \1'),
+        (r'from app.api.v1.endpoints.import_data import (.*)', r'from app.api.v1.endpoints.import_data import \1'),
+        (r'from app.api.v1.endpoints.predictions import (.*)', r'from app.api.v1.endpoints.predictions import \1'),
+        (r'from app.api.v1.endpoints.action_plans import (.*)', r'from app.api.v1.endpoints.action_plans import \1'),
+        
+        # Update core imports
+        (r'from app.core.predictor import (.*)', r'from app.core.predictor import \1'),
+        (r'from app.core.browsable_api import (.*)', r'from app.core.browsable_api import \1'),
+        
+        # Update utils imports
+        (r'from app.utils.enhanced_auth import (.*)', r'from app.utils.enhanced_auth import \1'),
+    ]
+    
+    # Apply all replacements
+    for pattern, replacement in replacements:
+        content = re.sub(pattern, replacement, content)
+    
+    # Write the updated content back
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
+def create_init_files():
+    """Create necessary __init__.py files in the directory structure"""
+    print("Creating __init__.py files...")
+    
+    # List of directories that need __init__.py files
+    init_directories = [
+        'app',
+        'app/api',
+        'app/api/v1',
+        'app/api/v1/endpoints',
+        'app/core',
+        'app/models',
+        'app/utils',
+    ]
+    
+    for directory in init_directories:
+        init_file = os.path.join('.', directory, '__init__.py')
+        if not os.path.exists(init_file):
+            with open(init_file, 'w', encoding='utf-8') as f:
+                f.write('"""\n{} package\n"""\n'.format(directory.split('/')[-1]))
+            print(f"  [CREATE] {init_file}")
+
+def migrate_files():
+    """Migrate files to their new locations and update imports"""
+    print("Starting file migration...")
+    
+    # First, ensure all necessary directories exist
+    for dest_file in FILE_MAPPINGS.values():
+        dest_dir = os.path.dirname(dest_file)
+        if dest_dir and not os.path.exists(dest_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+            print(f"  [CREATE] Directory {dest_dir}")
+    
+    # Create necessary __init__.py files
+    create_init_files()
+    
+    # Process regular files
+    for source, dest in FILE_MAPPINGS.items():
+        source_path = os.path.join('.', source)
+        dest_path = os.path.join('.', dest)
+        
+        # Skip if source doesn't exist
+        if not os.path.exists(source_path):
+            print(f"  [SKIP] {source} does not exist")
+            continue
+        
+        # Skip if source and dest are the same file
+        if os.path.abspath(source_path) == os.path.abspath(dest_path):
+            print(f"  [SKIP] {source} and {dest} are the same file")
+            continue
+            
+        # Skip if dest already exists and is newer than source
+        if os.path.exists(dest_path) and os.path.getmtime(dest_path) > os.path.getmtime(source_path):
+            print(f"  [SKIP] {dest} is newer than {source}")
+            continue
+        
+        # Create destination directory if it doesn't exist
+        dest_dir = os.path.dirname(dest_path)
+        os.makedirs(dest_dir, exist_ok=True)
+        
+        # Copy the file
+        print(f"  [COPY] {source} -> {dest}")
+        shutil.copy2(source_path, dest_path)
+        
+        # Update imports in Python files
+        if dest_path.endswith('.py'):
+            print(f"  [UPDATE] Fixing imports in {dest}")
+            update_import_statements(dest_path)
+    
+    # Process template directories
+    for source, dest in TEMPLATE_MAPPINGS.items():
+        source_path = os.path.join('.', source)
+        dest_path = os.path.join('.', dest)
+        
+        if os.path.exists(source_path):
+            print(f"  [COPY] {source}/ -> {dest}/")
+            os.makedirs(dest_path, exist_ok=True)
+            # Use distutils to copy the directory contents
+            for item in os.listdir(source_path):
+                s = os.path.join(source_path, item)
+                d = os.path.join(dest_path, item)
+                if os.path.isdir(s):
+                    if not os.path.exists(d):
+                        shutil.copytree(s, d)
+                else:
+                    shutil.copy2(s, d)
+    
+    # Process ML model directories
+    for source, dest in ML_MAPPINGS.items():
+        source_path = os.path.join('.', source)
+        dest_path = os.path.join('.', dest)
+        
+        if os.path.exists(source_path):
+            print(f"  [COPY] {source}/ -> {dest}/")
+            os.makedirs(dest_path, exist_ok=True)
+            # Use distutils to copy the directory contents
+            for item in os.listdir(source_path):
+                s = os.path.join(source_path, item)
+                d = os.path.join(dest_path, item)
+                if os.path.isdir(s):
+                    if not os.path.exists(d):
+                        shutil.copytree(s, d)
+                else:
+                    shutil.copy2(s, d)
+    
+    # Process Swagger specs directories
+    for source, dest in SWAGGER_MAPPINGS.items():
+        source_path = os.path.join('.', source)
+        dest_path = os.path.join('.', dest)
+        
+        if os.path.exists(source_path):
+            print(f"  [COPY] {source}/ -> {dest}/")
+            os.makedirs(dest_path, exist_ok=True)
+            # Use distutils to copy the directory contents
+            for item in os.listdir(source_path):
+                s = os.path.join(source_path, item)
+                d = os.path.join(dest_path, item)
+                if os.path.isdir(s):
+                    if not os.path.exists(d):
+                        shutil.copytree(s, d)
+                else:
+                    shutil.copy2(s, d)
+    
+    print("File migration complete!")
+
+
+if __name__ == "__main__":
+    migrate_files()

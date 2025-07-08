@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""
+Seed script for TAQATHON Equipment Reliability API
+Loads anomalies from the Excel file with their existing prediction values
+"""
+
+try:
+    import pandas as pd
+except ImportError:
+    print("❌ pandas module not found. Please install it with:")
+    print("   pip install pandas")
+    print("or:")
+    print("   pip install -r requirements.txt")
+    import sys
+    sys.exit(1)
+    
+from datetime import datetime
+import sys
+import os
+
+# Add the parent directory to the path so we can import our modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from main import app
+from app.models import db, Anomaly
+
+try:
+    from dotenv import load_dotenv
+    # Load environment variables
+    load_dotenv()
+except ImportError:
+    print("⚠️ python-dotenv module not found. Environment variables may not be loaded.")
+    print("  You can install it with: pip install python-dotenv")
+
+def seed_anomalies():
+    """Load anomalies from Excel file and seed the database"""
+    
+    print("🌱 Starting database seeding...")
+    
+    # Read the Excel file
+    excel_path = "ml_models/Taqathon_data_01072025.xlsx"
+    
+    # Check if the Excel file exists
+    if not os.path.exists(excel_path):
+        print(f"❌ Error: Excel file not found at {excel_path}")
+        print("   Please ensure the file exists and is in the correct location")
+        return False
+    
+    try:
+        print(f"📖 Reading data from {excel_path}...")
+        df = pd.read_excel(excel_path)
+        print(f"✅ Successfully loaded {len(df)} records from Excel file")
+        
+        print("\n📋 Excel columns found:")
+        for col in df.columns:
+            print(f"   - {col}")
+            
+    except Exception as e:
+        print(f"❌ Error reading Excel file: {str(e)}")
+        return False
+    
+    # Expected columns based on the model training
+    expected_columns = [
+        "Num_equipement",
+        "Systeme", 
+        "Description",
+        "Date de détéction de l'anomalie",
+        "Description de l'équipement",
+        "Section propriétaire",
+        "Fiabilité Intégrité",
+        "Disponibilté", 
+        "Process Safety",
+        "Criticité"
+    ]
+    
+    # Check if all required columns exist
+    missing_columns = [col for col in expected_columns if col not in df.columns]
+    if missing_columns:
+        print(f"⚠️  Missing columns: {missing_columns}")
+        print("Available columns:", list(df.columns))
+        # Continue anyway, we'll handle missing columns
+    
+    # Fill missing values
+    df = df.fillna("unknown")
+    
+    print(f"\n🗄️  Connecting to database...")
+    
+    with app.app_context():
+        try:
+            # Clear existing anomalies (optional - comment out if you want to keep existing data)
+            print("🧹 Clearing existing anomalies...")
+            db.session.query(Anomaly).delete()
+            db.session.commit()
+            print("✅ Existing anomalies cleared")
+            
+            print(f"📥 Inserting {len(df)} anomalies...")
+            
+            successful_inserts = 0
+            failed_inserts = 0
+            
+            for index, row in df.iterrows():
+                try:
+                    # Parse date
+                    try:
+                        if pd.notna(row.get("Date de détéction de l'anomalie")):
+                            date_detection = pd.to_datetime(row["Date de détéction de l'anomalie"])
+                        else:
+                            # Use a default date if missing
+                            date_detection = datetime(2019, 1, 1, 10, 0, 0)
+                    except:
+                        date_detection = datetime(2019, 1, 1, 10, 0, 0)
+                    
+                    # Create anomaly record
+                    anomaly = Anomaly(
+                        # Basic identification info
+                        num_equipement=str(row.get("Num_equipement", f"unknown_{index}")),
+                        systeme=str(row.get("Systeme", "unknown")),
+                        # Title and description
+                        title=f"{row.get('Systeme', 'Unknown')} - {row.get('Num_equipement', f'unknown_{index}')}",
+                        description=str(row.get("Description", "unknown")),
+                        # Original fields
+                        date_detection=date_detection,
+                        description_equipement=str(row.get("Description de l'équipement", "unknown")),
+                        section_proprietaire=str(row.get("Section propriétaire", "unknown")),
+                        # Set service from section_proprietaire
+                        service=str(row.get("Section propriétaire", "unknown")),
+                        # Set AI prediction scores from Excel (already correct values)
+                        fiabilite_score=float(row.get("Fiabilité Intégrité", 0.0)) if pd.notna(row.get("Fiabilité Intégrité")) else 0.0,
+                        disponibilite_score=float(row.get("Disponibilté", 0.0)) if pd.notna(row.get("Disponibilté")) else 0.0,
+                        process_safety_score=float(row.get("Process Safety", 0.0)) if pd.notna(row.get("Process Safety")) else 0.0,
+                        criticality_level=float(row.get("Criticité", 0.0)) if pd.notna(row.get("Criticité")) else 0.0,
+                        # Set status and priority
+                        status="open",
+                        priority="medium",
+                        # Set as approved since these are the correct values
+                        is_approved=True,
+                        approved_at=datetime.utcnow(),
+                        # No specific user created these (seed data)
+                        created_by_user_id=None,
+                        updated_by_user_id=None,
+                        approved_by_user_id=None
+                    )
+                    
+                    db.session.add(anomaly)
+                    successful_inserts += 1
+                    
+                    # Commit in batches of 100 for better performance
+                    if successful_inserts % 100 == 0:
+                        db.session.commit()
+                        print(f"   ✅ Inserted {successful_inserts} records...")
+                        
+                except Exception as e:
+                    print(f"   ❌ Error inserting row {index}: {str(e)}")
+                    failed_inserts += 1
+                    continue
+            
+            # Final commit
+            db.session.commit()
+            
+            print(f"\n🎉 Seeding completed!")
+            print(f"   ✅ Successfully inserted: {successful_inserts} anomalies")
+            print(f"   ❌ Failed insertions: {failed_inserts} anomalies")
+            print(f"   📊 Total processed: {len(df)} records")
+            
+            if successful_inserts > 0:
+                print(f"\n📋 Sample of inserted data:")
+                sample = db.session.query(Anomaly).limit(3).all()
+                for anomaly in sample:
+                    print(f"   - ID: {anomaly.id}, Equipment: {anomaly.num_equipement}")
+                    print(f"     Predictions: F={anomaly.fiabilite_score}, D={anomaly.disponibilite_score}, PS={anomaly.process_safety_score}, C={anomaly.criticality_level}")
+                    print(f"     Approved: {anomaly.is_approved}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Database error: {str(e)}")
+            db.session.rollback()
+            return False
+
+def main():
+    """Main function"""
+    print("🚀 TAQATHON Database Seeding Script")
+    print("=" * 50)
+    
+    if seed_anomalies():
+        print("\n✅ Database seeding completed successfully!")
+        print("\n💡 You can now:")
+        print("   - Start the API server: python main.py")
+        print("   - View anomalies at: GET /api/v1/anomalies")
+        print("   - All seeded anomalies are pre-approved with correct prediction values")
+    else:
+        print("\n❌ Database seeding failed!")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

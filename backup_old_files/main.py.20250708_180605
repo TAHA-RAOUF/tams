@@ -1,0 +1,207 @@
+from flask import Flask, jsonify
+from flask_restful import Api
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+from app.api.v1.endpoints.predictions import EquipmentReliabilityPredictorAPI, BatchEquipmentPredictorAPI, FileEquipmentPredictorAPI
+from app.api.v1.endpoints.auth import RegisterAPI, LoginAPI, ProfileAPI
+from app.api.v1.endpoints.anomalies import AnomalyAPI, BatchAnomalyAPI, FileAnomalyAPI, AnomalyApprovalAPI, AnomalyPredictionEditAPI
+from app.core.browsable_api import BrowsableAPI
+from app.models import db, bcrypt
+import os
+from datetime import timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+app = Flask(__name__, template_folder='templates')
+
+# Configure CORS
+CORS(app)
+
+# Configure Database
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///taqathon.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configure JWT
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'taqathon-super-secret-key-change-in-production')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
+app.secret_key = os.environ.get('SECRET_KEY', 'taqathon-secret-key-change-in-production')
+app.config['SESSION_USE_SIGNER'] = True
+
+# Initialize extensions
+db.init_app(app)
+bcrypt.init_app(app)
+jwt = JWTManager(app)
+
+# Error handlers to return JSON instead of HTML
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        'error': 'Not Found',
+        'message': 'The requested resource was not found on this server.',
+        'status_code': 404
+    }), 404
+
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({
+        'error': 'Bad Request',
+        'message': 'The request could not be understood by the server.',
+        'status_code': 400
+    }), 400
+
+@app.errorhandler(401)
+def unauthorized(error):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Authentication is required to access this resource.',
+        'status_code': 401
+    }), 401
+
+@app.errorhandler(403)
+def forbidden(error):
+    return jsonify({
+        'error': 'Forbidden',
+        'message': 'You do not have permission to access this resource.',
+        'status_code': 403
+    }), 403
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    return jsonify({
+        'error': 'Method Not Allowed',
+        'message': 'The method is not allowed for the requested URL.',
+        'status_code': 405
+    }), 405
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': 'The server encountered an internal error and was unable to complete your request.',
+        'status_code': 500
+    }), 500
+
+# Import new modules
+from app.api.v1.endpoints.maintenance import MaintenanceWindowAPI, ScheduleAnomalyAPI, ActionPlanAPI, ActionItemAPI
+from app.api.v1.endpoints.dashboard import (
+    DashboardMetricsAPI, AnomaliesByMonthAPI, AnomaliesByServiceAPI, 
+    AnomaliesByCriticalityAPI, MaintenanceWindowChartAPI
+)
+from app.api.v1.endpoints.import_data import ImportAnomaliesAPI
+from app.api.v1.endpoints.status import AnomalyStatusAPI, AnomalyBulkStatusAPI
+from app.api.v1.endpoints.auth import LogoutAPI
+
+# Initialize browsable API (DRF-style interface)
+api = Api(app, prefix='/api/v1')
+browsable = BrowsableAPI(app, api)
+
+# Register authentication endpoints
+api.add_resource(RegisterAPI, '/auth/register')
+api.add_resource(LoginAPI, '/auth/login')
+api.add_resource(LogoutAPI, '/auth/logout')
+api.add_resource(ProfileAPI, '/auth/profile')
+
+# Register anomaly management endpoints
+api.add_resource(AnomalyAPI, '/anomalies', '/anomalies/<int:anomaly_id>')
+api.add_resource(BatchAnomalyAPI, '/anomalies/batch')
+api.add_resource(FileAnomalyAPI, '/anomalies/upload')
+api.add_resource(AnomalyApprovalAPI, '/anomalies/<int:anomaly_id>/approve')
+api.add_resource(AnomalyPredictionEditAPI, '/anomalies/<int:anomaly_id>/predictions')
+api.add_resource(AnomalyStatusAPI, '/anomalies/<int:anomaly_id>/status')
+api.add_resource(AnomalyBulkStatusAPI, '/anomalies/bulk/status')
+
+# Register maintenance window endpoints
+api.add_resource(MaintenanceWindowAPI, '/maintenance-windows', '/maintenance-windows/<int:window_id>')
+api.add_resource(ScheduleAnomalyAPI, '/maintenance-windows/<int:window_id>/schedule-anomaly')
+
+# Register action plan endpoints
+api.add_resource(ActionPlanAPI, '/action-plans', '/action-plans/<int:anomaly_id>')
+api.add_resource(ActionItemAPI, '/action-plans/<int:action_plan_id>/items', 
+                '/action-plans/<int:action_plan_id>/items/<int:item_id>')
+
+# Register dashboard endpoints
+api.add_resource(DashboardMetricsAPI, '/dashboard/metrics')
+api.add_resource(AnomaliesByMonthAPI, '/dashboard/charts/anomalies-by-month')
+api.add_resource(AnomaliesByServiceAPI, '/dashboard/charts/anomalies-by-service')
+api.add_resource(AnomaliesByCriticalityAPI, '/dashboard/charts/anomalies-by-criticality')
+api.add_resource(MaintenanceWindowChartAPI, '/dashboard/charts/maintenance-windows')
+
+# Register import endpoints
+api.add_resource(ImportAnomaliesAPI, '/import/anomalies')
+
+# Register prediction API endpoints (protected with JWT)
+api.add_resource(EquipmentReliabilityPredictorAPI, '/predict')
+api.add_resource(BatchEquipmentPredictorAPI, '/predict-batch')
+api.add_resource(FileEquipmentPredictorAPI, '/predict-file')
+
+# Create database tables
+with app.app_context():
+    db.create_all()
+
+if __name__ == '__main__':
+    print("Starting TAQATHON Equipment Reliability Prediction API...")
+    print("🌐 Browsable API (DRF-style): http://localhost:5000/api-browser/")
+    print("📋 API Endpoints Browser: http://localhost:5000/api-browser/endpoints")
+    print("🔑 Authentication: http://localhost:5000/api-browser/auth/login")
+    print("API endpoints:")
+    print("  Authentication:")
+    print("    - POST /api/v1/auth/register - Register new user")
+    print("    - POST /api/v1/auth/login - Login user")
+    print("    - POST /api/v1/auth/logout - Logout user (client-side)")
+    print("    - GET/PUT /api/v1/auth/profile - Get/update user profile (JWT required)")
+    
+    print("\n  Anomaly Management (JWT required):")
+    print("    - GET /api/v1/anomalies - Get all anomalies with pagination")
+    print("    - POST /api/v1/anomalies - Create single anomaly with prediction")
+    print("    - GET /api/v1/anomalies/<id> - Get specific anomaly")
+    print("    - PUT /api/v1/anomalies/<id> - Update anomaly")
+    print("    - DELETE /api/v1/anomalies/<id> - Delete anomaly")
+    print("    - POST /api/v1/anomalies/<id>/approve - Approve anomaly predictions")
+    print("    - PUT /api/v1/anomalies/<id>/predictions - Edit anomaly predictions")
+    print("    - PUT /api/v1/anomalies/<id>/status - Update anomaly status with flow validation")
+    print("    - PUT /api/v1/anomalies/bulk/status - Update multiple anomalies' statuses")
+    print("    - POST /api/v1/anomalies/batch - Create multiple anomalies")
+    print("    - POST /api/v1/anomalies/upload - Upload CSV/Excel file")
+    
+    print("\n  Maintenance Windows (JWT required):")
+    print("    - GET /api/v1/maintenance-windows - Get all maintenance windows with filtering")
+    print("    - POST /api/v1/maintenance-windows - Create maintenance window")
+    print("    - GET /api/v1/maintenance-windows/<id> - Get specific window")
+    print("    - PUT /api/v1/maintenance-windows/<id> - Update window")
+    print("    - DELETE /api/v1/maintenance-windows/<id> - Delete window")
+    print("    - POST /api/v1/maintenance-windows/<id>/schedule-anomaly - Schedule anomaly to window")
+    
+    print("\n  Action Plans (JWT required):")
+    print("    - POST /api/v1/action-plans/<anomaly_id> - Create action plan")
+    print("    - GET /api/v1/action-plans/<anomaly_id> - Get action plan")
+    print("    - PUT /api/v1/action-plans/<anomaly_id> - Update action plan")
+    print("    - POST /api/v1/action-plans/<id>/items - Add action item")
+    print("    - PUT /api/v1/action-plans/<id>/items/<item_id> - Update action item")
+    print("    - DELETE /api/v1/action-plans/<id>/items/<item_id> - Delete action item")
+    
+    print("\n  Dashboard & Reporting (JWT required):")
+    print("    - GET /api/v1/dashboard/metrics - Get overview metrics")
+    print("    - GET /api/v1/dashboard/charts/anomalies-by-month - Get anomalies by month")
+    print("    - GET /api/v1/dashboard/charts/anomalies-by-service - Get anomalies by service")
+    print("    - GET /api/v1/dashboard/charts/anomalies-by-criticality - Get anomalies by criticality")
+    print("    - GET /api/v1/dashboard/charts/maintenance-windows - Get maintenance window timeline")
+    
+    print("\n  Data Import (JWT required):")
+    print("    - POST /api/v1/import/anomalies - Import anomalies from file")
+    
+    print("\n  Direct Predictions (JWT required):")
+    print("    - GET/POST /api/v1/predict - Single equipment reliability prediction")
+    print("    - POST /api/v1/predict-batch - Batch equipment reliability prediction")
+    print("    - POST /api/v1/predict-file - File-based prediction")
+    
+    print("\nFeatures for ML prediction: Num_equipement, Systeme, Description")
+    print("Predicted outputs: Fiabilité Intégrité, Disponibilité, Process Safety")
+    print("Criticality is calculated as sum of the three scores")
+    
+    print("\n🎯 Use the browsable API at http://localhost:5000/api-browser/ for easy testing!")
+    print("Note: All endpoints require JWT authentication")
+    print("User actions are tracked (created_by, updated_by, approved_by)")
+    
+    app.run(debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true')

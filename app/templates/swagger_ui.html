@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TAQATHON API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('flasgger.static', filename='swagger-ui-bundle.css') }}">
+    <style>
+        .swagger-ui .info {
+            margin: 20px 0;
+        }
+        .auth-container {
+            background: #f7f7f7;
+            border: 1px solid #d3d3d3;
+            border-radius: 4px;
+            margin: 20px 0;
+            padding: 15px;
+        }
+        .quick-auth {
+            margin: 10px 0;
+        }
+        .quick-auth input {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .quick-auth button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .quick-auth button:hover {
+            background: #45a049;
+        }
+        .quick-auth button.secondary {
+            background: #2196F3;
+        }
+        .quick-auth button.secondary:hover {
+            background: #1976D2;
+        }
+        .auth-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .auth-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .auth-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    
+    <!-- Quick Authentication Panel -->
+    <div class="auth-container" id="auth-panel">
+        <h3>🔐 Quick Authentication</h3>
+        <div class="auth-status" id="auth-status"></div>
+        
+        <div class="quick-auth">
+            <h4>Register New User:</h4>
+            <input type="text" id="reg-username" placeholder="Username" />
+            <input type="email" id="reg-email" placeholder="Email" />
+            <input type="password" id="reg-password" placeholder="Password" />
+            <button onclick="quickRegister()">Register</button>
+        </div>
+        
+        <div class="quick-auth">
+            <h4>Login:</h4>
+            <input type="text" id="login-username" placeholder="Username" />
+            <input type="password" id="login-password" placeholder="Password" />
+            <button onclick="quickLogin()" class="secondary">Login & Authorize</button>
+        </div>
+        
+        <div class="quick-auth">
+            <button onclick="clearAuth()" style="background: #f44336;">Clear Authorization</button>
+            <button onclick="toggleAuthPanel()" style="background: #9E9E9E;">Hide Panel</button>
+        </div>
+        
+        <div style="margin-top: 15px; font-size: 12px; color: #666;">
+            <strong>Instructions:</strong><br>
+            1. Register a new user or login with existing credentials<br>
+            2. Token will be automatically set in Swagger authorization<br>
+            3. Test protected endpoints - token persists across page reloads<br>
+            4. Use the "Authorize" button above to manually set tokens
+        </div>
+    </div>
+
+    <script src="{{ url_for('flasgger.static', filename='swagger-ui-bundle.js') }}"></script>
+    <script>
+        // Initialize Swagger UI
+        const ui = SwaggerUIBundle({
+            url: '{{ swagger_spec_url }}',
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.presets.standalone
+            ],
+            layout: "BaseLayout",
+            persistAuthorization: true,
+            displayRequestDuration: true,
+            docExpansion: "none",
+            defaultModelsExpandDepth: 2,
+            defaultModelExpandDepth: 2,
+            supportedSubmitMethods: ["get", "post", "put", "delete", "patch"],
+            validatorUrl: null,
+            onComplete: function() {
+                // Load saved token on page load
+                const savedToken = localStorage.getItem('jwt_token');
+                if (savedToken) {
+                    authorizeWithToken(savedToken);
+                    showStatus('Previously saved token loaded automatically', 'success');
+                }
+            }
+        });
+
+        // Quick registration function
+        async function quickRegister() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            
+            if (!username || !email || !password) {
+                showStatus('Please fill in all registration fields', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Registration successful! You can now login with username: ${username}`, 'success');
+                    // Clear registration fields
+                    document.getElementById('reg-username').value = '';
+                    document.getElementById('reg-email').value = '';
+                    document.getElementById('reg-password').value = '';
+                    // Pre-fill login fields
+                    document.getElementById('login-username').value = username;
+                } else {
+                    showStatus(`Registration failed: ${data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Registration error: ${error.message}`, 'error');
+            }
+        }
+
+        // Quick login function
+        async function quickLogin() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!username || !password) {
+                showStatus('Please fill in both username and password', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.access_token) {
+                    const token = data.access_token;
+                    
+                    // Save token to localStorage
+                    localStorage.setItem('jwt_token', token);
+                    
+                    // Authorize in Swagger UI
+                    authorizeWithToken(token);
+                    
+                    showStatus(`Login successful! Token saved and applied. Welcome ${data.user?.username || username}!`, 'success');
+                    
+                    // Clear login fields
+                    document.getElementById('login-password').value = '';
+                } else {
+                    showStatus(`Login failed: ${data.message || 'Invalid credentials'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Login error: ${error.message}`, 'error');
+            }
+        }
+
+        // Authorize with token in Swagger UI
+        function authorizeWithToken(token) {
+            if (ui && ui.authActions) {
+                ui.authActions.authorize({
+                    Bearer: {
+                        name: "Bearer",
+                        schema: {
+                            type: "apiKey",
+                            in: "header",
+                            name: "Authorization"
+                        },
+                        value: `Bearer ${token}`
+                    }
+                });
+            }
+        }
+
+        // Clear authorization
+        function clearAuth() {
+            localStorage.removeItem('jwt_token');
+            if (ui && ui.authActions) {
+                ui.authActions.logout();
+            }
+            showStatus('Authorization cleared', 'success');
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('auth-status');
+            statusEl.textContent = message;
+            statusEl.className = `auth-status ${type}`;
+            statusEl.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Toggle auth panel visibility
+        function toggleAuthPanel() {
+            const panel = document.getElementById('auth-panel');
+            const button = event.target;
+            
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                button.textContent = 'Hide Panel';
+            } else {
+                panel.style.display = 'none';
+                button.textContent = 'Show Auth Panel';
+            }
+        }
+
+        // Allow Enter key to trigger login
+        document.addEventListener('DOMContentLoaded', function() {
+            ['login-username', 'login-password'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        quickLogin();
+                    }
+                });
+            });
+            
+            ['reg-username', 'reg-email', 'reg-password'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        quickRegister();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

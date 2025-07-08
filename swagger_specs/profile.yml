@@ -1,0 +1,46 @@
+profile:
+  tags:
+    - Authentication
+  summary: Get user profile
+  description: Get current user's profile information (JWT required)
+  produces:
+    - application/json
+  security:
+    - Bearer: []
+  responses:
+    200:
+      description: User profile retrieved successfully
+      schema:
+        type: object
+        properties:
+          user:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              username:
+                type: string
+                example: "johndoe"
+              email:
+                type: string
+                example: "john@example.com"
+              created_at:
+                type: string
+                example: "2025-07-07T10:30:00.000000"
+    401:
+      description: Missing or invalid JWT token
+      schema:
+        type: object
+        properties:
+          msg:
+            type: string
+            example: "Missing Authorization Header"
+    404:
+      description: User not found
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+            example: "User not found"

@@ -1,0 +1,110 @@
+post:
+  tags:
+    - Batch Prediction
+  summary: Batch Anomaly Prediction
+  description: Predict for multiple anomalies in a single request
+  parameters:
+    - in: body
+      name: body
+      description: Batch anomaly data
+      required: true
+      schema:
+        type: object
+        properties:
+          anomalies:
+            type: array
+            items:
+              type: object
+              properties:
+                Systeme:
+                  type: string
+                  example: "System A"
+                Description de l'équipement:
+                  type: string
+                  example: "Equipment description"
+                Section propriétaire:
+                  type: string
+                  example: "Owner section"
+                Description:
+                  type: string
+                  example: "Anomaly description text"
+              required:
+                - Systeme
+                - Description de l'équipement
+                - Section propriétaire
+                - Description
+            example:
+              - Systeme: "System A"
+                Description de l'équipement: "Pump equipment"
+                Section propriétaire: "Maintenance"
+                Description: "Vibration detected in main pump"
+              - Systeme: "System B"
+                Description de l'équipement: "Valve equipment"
+                Section propriétaire: "Operations"
+                Description: "Pressure loss in control valve"
+        required:
+          - anomalies
+  responses:
+    200:
+      description: Successful batch prediction
+      schema:
+        type: object
+        properties:
+          predictions:
+            type: array
+            items:
+              type: object
+              properties:
+                index:
+                  type: integer
+                  example: 0
+                prediction:
+                  type: object
+                  properties:
+                    Fiabilité Intégrité:
+                      type: number
+                      example: 3.2
+                    Disponibilté:
+                      type: number
+                      example: 2.8
+                    Process Safety:
+                      type: number
+                      example: 1.5
+                    Criticité:
+                      type: number
+                      example: 2.5
+      examples:
+        application/json:
+          predictions:
+            - index: 0
+              prediction:
+                Fiabilité Intégrité: 3.2
+                Disponibilté: 2.8
+                Process Safety: 1.5
+                Criticité: 2.5
+            - index: 1
+              prediction:
+                Fiabilité Intégrité: 2.1
+                Disponibilté: 3.4
+                Process Safety: 2.0
+                Criticité: 2.5
+    400:
+      description: Bad request - missing or invalid data
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "Missing required field in anomaly at index 1: Description"
+    500:
+      description: Internal server error
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "Model prediction failed"

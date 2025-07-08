@@ -1,0 +1,100 @@
+post:
+  tags:
+    - File Prediction
+  summary: File-based Prediction
+  description: Predict anomalies from a CSV or Excel file
+  parameters:
+    - in: body
+      name: body
+      description: File prediction data
+      required: true
+      schema:
+        type: object
+        properties:
+          file_path:
+            type: string
+            example: "ml_models/Taqathon_data_01072025.xlsx"
+          output_path:
+            type: string
+            example: "predictions_output.csv"
+        required:
+          - file_path
+  responses:
+    200:
+      description: Successful file prediction
+      schema:
+        type: object
+        properties:
+          message:
+            type: string
+            example: "File processed successfully"
+          total_records:
+            type: integer
+            example: 150
+          results:
+            type: array
+            items:
+              type: object
+              properties:
+                Systeme:
+                  type: string
+                Description de l'équipement:
+                  type: string
+                Section propriétaire:
+                  type: string
+                Description:
+                  type: string
+                Fiabilité Intégrité_predicted:
+                  type: number
+                Disponibilté_predicted:
+                  type: number
+                Process Safety_predicted:
+                  type: number
+                Criticité_predicted:
+                  type: number
+            description: "Preview of first 10 records with predictions"
+          output_saved_to:
+            type: string
+            example: "predictions_output.csv"
+      examples:
+        application/json:
+          message: "File processed successfully"
+          total_records: 150
+          results:
+            - Systeme: "System A"
+              Description de l'équipement: "Pump equipment"
+              Section propriétaire: "Maintenance"
+              Description: "Vibration detected in main pump"
+              Fiabilité Intégrité_predicted: 3.2
+              Disponibilté_predicted: 2.8
+              Process Safety_predicted: 1.5
+              Criticité_predicted: 2.5
+            - Systeme: "System B"
+              Description de l'équipement: "Valve equipment"
+              Section propriétaire: "Operations"
+              Description: "Pressure loss in control valve"
+              Fiabilité Intégrité_predicted: 2.1
+              Disponibilté_predicted: 3.4
+              Process Safety_predicted: 2.0
+              Criticité_predicted: 2.5
+          output_saved_to: "predictions_output.csv"
+    400:
+      description: Bad request - missing file_path
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "Missing required field: file_path"
+    500:
+      description: Internal server error
+      schema:
+        type: object
+        properties:
+          error:
+            type: string
+      examples:
+        application/json:
+          error: "File not found or could not be processed"

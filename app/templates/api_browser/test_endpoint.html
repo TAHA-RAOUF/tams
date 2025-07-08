@@ -1,0 +1,517 @@
+{% extends "api_browser/base.html" %}
+
+{% block content %}
+<div class="welcome-card">
+    <h1>🧪 Test Endpoint: {{ endpoint_path }}</h1>
+    <p>Interactive testing interface for the <code>{{ endpoint_path }}</code> endpoint.</p>
+    
+    {% if current_user %}
+        <div class="auth-status authenticated">
+            ✅ <strong>Authenticated as {{ current_user.username }}</strong> - JWT token will be automatically included in requests.
+        </div>
+    {% else %}
+        <div class="auth-status">
+            🔒 <strong>Not authenticated</strong> - Some endpoints may require authentication. <a href="{{ url_for('browsable_api.auth_login') }}">Login here</a>.
+        </div>
+    {% endif %}
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+    <!-- Request Panel -->
+    <div class="feature-card">
+        <h3>📤 Request</h3>
+        
+        <form id="api-form" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label for="method" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">HTTP Method:</label>
+                <select id="method" name="method" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="url" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">URL:</label>
+                <input type="text" id="url" name="url" value="{{ endpoint_path }}" 
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
+            </div>
+            
+            <div id="json-body-section" style="display: none;">
+                <label for="json-body" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">JSON Body:</label>
+                <textarea id="json-body" name="json-body" rows="10" 
+                          style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 0.875rem;"
+                          placeholder='{"key": "value"}'></textarea>
+                <small style="color: #6c757d;">Enter valid JSON data for POST/PUT requests</small>
+            </div>
+            
+            <div id="form-fields-section">
+                <!-- Dynamic form fields will be added here -->
+            </div>
+            
+            <button type="submit" class="btn" style="width: 100%;">
+                🚀 Send Request
+            </button>
+        </form>
+        
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+            <h4>💡 Quick Templates:</h4>
+            
+            <div style="margin-top: 0.5rem;">
+                <strong>🔐 Authentication:</strong>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                    <button onclick="loadTemplate('auth_register')" class="btn btn-secondary" style="font-size: 0.875rem;">Register</button>
+                    <button onclick="loadTemplate('auth_login')" class="btn btn-secondary" style="font-size: 0.875rem;">Login</button>
+                    <button onclick="loadTemplate('auth_profile_update')" class="btn btn-secondary" style="font-size: 0.875rem;">Update Profile</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 0.5rem;">
+                <strong>📊 Anomalies:</strong>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                    <button onclick="loadTemplate('create_anomaly')" class="btn btn-secondary" style="font-size: 0.875rem;">Create</button>
+                    <button onclick="loadTemplate('update_anomaly')" class="btn btn-secondary" style="font-size: 0.875rem;">Update</button>
+                    <button onclick="loadTemplate('update_anomaly_status')" class="btn btn-secondary" style="font-size: 0.875rem;">Status</button>
+                    <button onclick="loadTemplate('update_predictions')" class="btn btn-secondary" style="font-size: 0.875rem;">Predictions</button>
+                    <button onclick="loadTemplate('bulk_status_update')" class="btn btn-secondary" style="font-size: 0.875rem;">Bulk Update</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 0.5rem;">
+                <strong>📅 Maintenance & Actions:</strong>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                    <button onclick="loadTemplate('create_maintenance')" class="btn btn-secondary" style="font-size: 0.875rem;">Create Window</button>
+                    <button onclick="loadTemplate('schedule_anomaly')" class="btn btn-secondary" style="font-size: 0.875rem;">Schedule</button>
+                    <button onclick="loadTemplate('create_action_plan')" class="btn btn-secondary" style="font-size: 0.875rem;">Action Plan</button>
+                    <button onclick="loadTemplate('add_action_item')" class="btn btn-secondary" style="font-size: 0.875rem;">Action Item</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 0.5rem;">
+                <strong>🤖 Predictions & Reports:</strong>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <button onclick="loadTemplate('predict')" class="btn btn-secondary" style="font-size: 0.875rem;">Predict</button>
+                    <button onclick="loadTemplate('predict_batch')" class="btn btn-secondary" style="font-size: 0.875rem;">Batch Predict</button>
+                    <button onclick="loadTemplate('dashboard_metrics')" class="btn btn-secondary" style="font-size: 0.875rem;">Dashboard</button>
+                    <button onclick="loadTemplate('anomalies_by_month')" class="btn btn-secondary" style="font-size: 0.875rem;">Charts</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Response Panel -->
+    <div class="feature-card">
+        <h3>📥 Response</h3>
+        
+        <div id="response-status" style="display: none; margin-bottom: 1rem;">
+            <strong>Status:</strong> <span id="status-code"></span> <span id="status-text"></span>
+        </div>
+        
+        <div id="response-headers" style="display: none; margin-bottom: 1rem;">
+            <h4>Headers:</h4>
+            <div class="code-block" id="headers-content"></div>
+        </div>
+        
+        <div id="response-body">
+            <div class="code-block" style="min-height: 200px; display: flex; align-items: center; justify-content: center; color: #6c757d;">
+                No response yet. Send a request to see the response here.
+            </div>
+        </div>
+        
+        <div id="response-time" style="margin-top: 1rem; color: #6c757d; font-size: 0.875rem; display: none;">
+            <strong>Response Time:</strong> <span id="time-value"></span>ms
+        </div>
+    </div>
+</div>
+
+<div class="welcome-card" style="margin-top: 2rem;">
+    <h3>📖 Endpoint Documentation</h3>
+    <div id="endpoint-docs">
+        <!-- Dynamic documentation will be loaded here -->
+    </div>
+</div>
+
+<script>
+let startTime;
+
+// Templates for common requests
+const templates = {
+    // Authentication templates
+    register: {
+        method: 'POST',
+        url: '/api/v1/auth/register',
+        body: JSON.stringify({
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpass123",
+            "name": "Test User",
+            "role": "Engineer",
+            "department": "Maintenance"
+        }, null, 2)
+    },
+    login: {
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        body: JSON.stringify({
+            "username": "testuser",
+            "password": "testpass123"
+        }, null, 2)
+    },
+    profile_update: {
+        method: 'PUT',
+        url: '/api/v1/auth/profile',
+        body: JSON.stringify({
+            "name": "Updated Name",
+            "email": "updated@example.com",
+            "role": "Senior Engineer",
+            "department": "Operations",
+            "phone": "555-123-4567"
+        }, null, 2)
+    },
+    
+    // Anomaly templates
+    create_anomaly: {
+        method: 'POST',
+        url: '/api/v1/anomalies',
+        body: JSON.stringify({
+            "num_equipement": "EQ001",
+            "systeme": "Turbine",
+            "description": "Primary turbine showing irregular vibration patterns",
+            "date_detection": new Date().toISOString().split('T')[0],
+            "description_equipement": "Primary turbine in power generation system",
+            "section_proprietaire": "Power Generation"
+        }, null, 2)
+    },
+    update_anomaly: {
+        method: 'PUT',
+        url: '/api/v1/anomalies/1',
+        body: JSON.stringify({
+            "description": "Updated: Primary turbine showing severe irregular vibration patterns",
+            "status": "In Progress",
+            "priority": "High"
+        }, null, 2)
+    },
+    update_anomaly_status: {
+        method: 'PUT',
+        url: '/api/v1/anomalies/1/status',
+        body: JSON.stringify({
+            "status": "In Progress",
+            "comments": "Moving to investigation phase"
+        }, null, 2)
+    },
+    update_predictions: {
+        method: 'PUT',
+        url: '/api/v1/anomalies/1/predictions',
+        body: JSON.stringify({
+            "fiabilite_integrite": 3,
+            "disponibilite": 4,
+            "process_safety": 2
+        }, null, 2)
+    },
+    bulk_status_update: {
+        method: 'PUT',
+        url: '/api/v1/anomalies/bulk/status',
+        body: JSON.stringify({
+            "anomalies": [1, 2, 3],
+            "status": "In Progress"
+        }, null, 2)
+    },
+    
+    // Prediction templates
+    predict: {
+        method: 'POST',
+        url: '/api/v1/predict',
+        body: JSON.stringify({
+            "Num_equipement": "EQ001",
+            "Systeme": "Turbine",
+            "Description": "Primary turbine showing irregular vibration patterns"
+        }, null, 2)
+    },
+    predict_batch: {
+        method: 'POST',
+        url: '/api/v1/predict-batch',
+        body: JSON.stringify({
+            "equipments": [
+                {
+                    "Num_equipement": "EQ001",
+                    "Systeme": "Turbine",
+                    "Description": "Primary turbine showing irregular vibration patterns"
+                },
+                {
+                    "Num_equipement": "EQ002",
+                    "Systeme": "Pump",
+                    "Description": "Secondary pump showing leakage"
+                }
+            ]
+        }, null, 2)
+    },
+    
+    // Maintenance Windows templates
+    create_maintenance: {
+        method: 'POST',
+        url: '/api/v1/maintenance-windows',
+        body: JSON.stringify({
+            "type": "Planned Outage",
+            "duration_days": 5,
+            "start_date": new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            "description": "Annual maintenance of turbine system",
+            "status": "Scheduled"
+        }, null, 2)
+    },
+    schedule_anomaly: {
+        method: 'POST',
+        url: '/api/v1/maintenance-windows/1/schedule-anomaly',
+        body: JSON.stringify({
+            "anomaly_id": 1,
+            "status": "Scheduled"
+        }, null, 2)
+    },
+    
+    // Action Plans templates
+    create_action_plan: {
+        method: 'POST',
+        url: '/api/v1/action-plans/1',
+        body: JSON.stringify({
+            "needs_outage": true,
+            "outage_type": "Partial",
+            "outage_duration": 8,
+            "planned_date": new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            "total_duration_hours": 16,
+            "total_duration_days": 2,
+            "estimated_cost": 5000,
+            "priority": "High",
+            "comments": "Critical equipment requiring immediate attention",
+            "action_items": [
+                {
+                    "action": "Inspect turbine blades",
+                    "responsable": "John Smith",
+                    "pdrs_disponible": true,
+                    "duree_heures": 3
+                },
+                {
+                    "action": "Replace damaged components",
+                    "responsable": "Technical Team",
+                    "duree_heures": 8
+                }
+            ]
+        }, null, 2)
+    },
+    add_action_item: {
+        method: 'POST',
+        url: '/api/v1/action-plans/1/items',
+        body: JSON.stringify({
+            "action": "Test turbine after repairs",
+            "responsable": "Quality Engineer",
+            "pdrs_disponible": true,
+            "ressources_internes": "Operations Team",
+            "ressources_externes": "Vendor Support",
+            "statut": "Planned",
+            "duree_heures": 4
+        }, null, 2)
+    },
+    
+    // Dashboard templates
+    dashboard_metrics: {
+        method: 'GET',
+        url: '/api/v1/dashboard/metrics'
+    },
+    anomalies_by_month: {
+        method: 'GET',
+        url: '/api/v1/dashboard/charts/anomalies-by-month?year=2023'
+    }
+};
+
+function loadTemplate(templateName) {
+    const template = templates[templateName];
+    if (template) {
+        document.getElementById('method').value = template.method;
+        document.getElementById('url').value = template.url;
+        document.getElementById('json-body').value = template.body;
+        updateFormDisplay();
+    }
+}
+
+function updateFormDisplay() {
+    const method = document.getElementById('method').value;
+    const jsonSection = document.getElementById('json-body-section');
+    
+    if (method === 'POST' || method === 'PUT') {
+        jsonSection.style.display = 'block';
+    } else {
+        jsonSection.style.display = 'none';
+    }
+}
+
+// Event listeners
+document.getElementById('method').addEventListener('change', updateFormDisplay);
+
+document.getElementById('api-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const method = document.getElementById('method').value;
+    const url = document.getElementById('url').value;
+    const jsonBody = document.getElementById('json-body').value;
+    
+    // Prepare request data
+    const requestData = {
+        method: method,
+        url: url,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if ((method === 'POST' || method === 'PUT') && jsonBody.trim()) {
+        try {
+            requestData.data = JSON.parse(jsonBody);
+        } catch (e) {
+            alert('Invalid JSON in request body');
+            return;
+        }
+    }
+    
+    // Show loading state
+    const responseBody = document.getElementById('response-body');
+    responseBody.innerHTML = '<div class="code-block" style="min-height: 200px; display: flex; align-items: center; justify-content: center; color: #6c757d;">Sending request...</div>';
+    
+    startTime = Date.now();
+    
+    try {
+        const response = await fetch('/api-browser/api-request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const result = await response.json();
+        displayResponse(result);
+        
+    } catch (error) {
+        displayError(error.message);
+    }
+});
+
+function displayResponse(result) {
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+    
+    // Status
+    const statusEl = document.getElementById('response-status');
+    const statusCodeEl = document.getElementById('status-code');
+    const statusTextEl = document.getElementById('status-text');
+    
+    statusEl.style.display = 'block';
+    statusCodeEl.textContent = result.status_code;
+    statusCodeEl.style.color = result.status_code >= 200 && result.status_code < 300 ? '#28a745' : '#dc3545';
+    statusTextEl.textContent = getStatusText(result.status_code);
+    
+    // Headers
+    const headersEl = document.getElementById('response-headers');
+    const headersContentEl = document.getElementById('headers-content');
+    
+    if (result.headers) {
+        headersEl.style.display = 'block';
+        headersContentEl.innerHTML = Object.entries(result.headers)
+            .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+            .join('<br>');
+    }
+    
+    // Body
+    const responseBody = document.getElementById('response-body');
+    if (result.data) {
+        responseBody.innerHTML = `<div class="code-block"><pre>${JSON.stringify(result.data, null, 2)}</pre></div>`;
+    } else if (result.text) {
+        responseBody.innerHTML = `<div class="code-block"><pre>${result.text}</pre></div>`;
+    } else {
+        responseBody.innerHTML = '<div class="code-block">No response body</div>';
+    }
+    
+    // Response time
+    const timeEl = document.getElementById('response-time');
+    const timeValueEl = document.getElementById('time-value');
+    timeEl.style.display = 'block';
+    timeValueEl.textContent = responseTime;
+}
+
+function displayError(errorMessage) {
+    const responseBody = document.getElementById('response-body');
+    responseBody.innerHTML = `<div class="code-block" style="color: #dc3545;"><strong>Error:</strong> ${errorMessage}</div>`;
+    
+    const statusEl = document.getElementById('response-status');
+    statusEl.style.display = 'none';
+    
+    const headersEl = document.getElementById('response-headers');
+    headersEl.style.display = 'none';
+}
+
+function getStatusText(code) {
+    const statusTexts = {
+        200: 'OK',
+        201: 'Created',
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        403: 'Forbidden',
+        404: 'Not Found',
+        405: 'Method Not Allowed',
+        500: 'Internal Server Error'
+    };
+    return statusTexts[code] || 'Unknown';
+}
+
+// Initialize form display
+updateFormDisplay();
+
+// Load appropriate template based on endpoint
+const endpointPath = '{{ endpoint_path }}';
+
+// Authentication endpoints
+if (endpointPath.includes('auth/register')) {
+    loadTemplate('auth_register');
+} else if (endpointPath.includes('auth/login')) {
+    loadTemplate('auth_login');
+} else if (endpointPath.includes('auth/profile')) {
+    loadTemplate('auth_profile_update');
+} 
+// Anomaly endpoints
+else if (endpointPath.includes('anomalies') && !endpointPath.includes('/')) {
+    loadTemplate('create_anomaly');
+} else if (endpointPath.match(/\/anomalies\/\d+$/)) {
+    loadTemplate('update_anomaly');
+} else if (endpointPath.includes('anomalies/batch')) {
+    loadTemplate('bulk_status_update');
+} else if (endpointPath.match(/\/anomalies\/\d+\/status/)) {
+    loadTemplate('update_anomaly_status');
+} else if (endpointPath.match(/\/anomalies\/\d+\/predictions/)) {
+    loadTemplate('update_predictions');
+} else if (endpointPath.includes('anomalies/bulk/status')) {
+    loadTemplate('bulk_status_update');
+} 
+// Maintenance endpoints
+else if (endpointPath.includes('maintenance-windows') && !endpointPath.includes('/')) {
+    loadTemplate('create_maintenance');
+} else if (endpointPath.includes('schedule-anomaly')) {
+    loadTemplate('schedule_anomaly');
+} 
+// Action Plan endpoints
+else if (endpointPath.match(/\/action-plans\/\d+$/) && !endpointPath.includes('items')) {
+    loadTemplate('create_action_plan');
+} else if (endpointPath.includes('action-plans') && endpointPath.includes('items')) {
+    loadTemplate('add_action_item');
+} 
+// Prediction endpoints
+else if (endpointPath.includes('predict') && !endpointPath.includes('-')) {
+    loadTemplate('predict');
+} else if (endpointPath.includes('predict-batch')) {
+    loadTemplate('predict_batch');
+} 
+// Dashboard endpoints
+else if (endpointPath.includes('dashboard/metrics')) {
+    loadTemplate('dashboard_metrics');
+} else if (endpointPath.includes('dashboard/charts')) {
+    loadTemplate('anomalies_by_month');
+}
+</script>
+{% endblock %}

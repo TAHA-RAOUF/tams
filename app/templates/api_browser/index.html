@@ -1,0 +1,158 @@
+{% extends "api_browser/base.html" %}
+
+{% block content %}
+<div class="welcome-card">
+    <h1>Welcome to {{ api_title }}</h1>
+    <p class="lead">
+        A Django REST Framework-style browsable API for testing and exploring the TAQATHON Equipment Reliability Prediction API.
+    </p>
+    
+    {% if current_user %}
+        <div class="auth-status authenticated">
+            ✅ <strong>Authenticated as {{ current_user.username }}</strong> - You can now test all protected endpoints!
+        </div>
+    {% else %}
+        <div class="auth-status">
+            🔒 <strong>Not authenticated</strong> - Please <a href="{{ url_for('browsable_api.login') }}">login</a> or <a href="{{ url_for('browsable_api.register') }}">register</a> to test protected endpoints.
+        </div>
+    {% endif %}
+    
+    <div class="quick-start">
+        <h4>🚀 Quick Start Guide:</h4>
+        <ol>
+            <li><strong>Authentication:</strong> Register/Login to get access to protected endpoints</li>
+            <li><strong>Browse API:</strong> Check out all available endpoints and their documentation</li>
+            <li><strong>Test Endpoints:</strong> Use the interactive forms to test API calls</li>
+            <li><strong>View Responses:</strong> See formatted JSON responses and HTTP status codes</li>
+        </ol>
+    </div>
+</div>
+
+<div class="features">
+    <div class="feature-card">
+        <h3>🔐 Authentication</h3>
+        <p>Complete user management with JWT token-based authentication. Register new accounts, login, and manage your profile.</p>
+        {% if not current_user %}
+            <a href="{{ url_for('browsable_api.register') }}" class="btn btn-success">Register Account</a>
+            <a href="{{ url_for('browsable_api.login') }}" class="btn">Login</a>
+        {% else %}
+            <p><strong>✅ You are logged in as {{ current_user.username }}</strong></p>
+            <a href="{{ url_for('browsable_api.logout') }}" class="btn btn-secondary">Logout</a>
+        {% endif %}
+    </div>
+    
+    <div class="feature-card">
+        <h3>📊 Anomaly Management</h3>
+        <p>Create, view, edit, and approve equipment anomalies. All users can access all anomalies with full collaboration features.</p>
+        <div class="code-block">
+            Features: Num_equipement, Systeme, Description<br>
+            Outputs: Fiabilité, Disponibilité, Process Safety, Criticité
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='anomalies') }}" class="btn">Test Anomalies API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>🤖 ML Predictions</h3>
+        <p>Get equipment reliability predictions using machine learning models. Support for single predictions, batch processing, and file uploads.</p>
+        <div class="code-block">
+            POST /api/v1/predict<br>
+            POST /api/v1/predict-batch<br>
+            POST /api/v1/predict-file
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='predict') }}" class="btn">Test Predictions API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>� Maintenance Windows</h3>
+        <p>Plan and schedule maintenance windows, assign anomalies to maintenance periods, and track progress.</p>
+        <div class="code-block">
+            GET/POST /api/v1/maintenance-windows<br>
+            POST /api/v1/maintenance-windows/&lt;id&gt;/schedule-anomaly
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='maintenance-windows') }}" class="btn">Test Maintenance API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>📝 Action Plans</h3>
+        <p>Create and manage action plans and action items for anomalies, track responsibilities and status.</p>
+        <div class="code-block">
+            GET/POST /api/v1/action-plans/&lt;anomaly_id&gt;<br>
+            POST /api/v1/action-plans/&lt;id&gt;/items
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='action-plans/1') }}" class="btn">Test Action Plans API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>📈 Dashboard & Reports</h3>
+        <p>Access real-time metrics, KPIs and chart data for your equipment monitoring dashboard.</p>
+        <div class="code-block">
+            GET /api/v1/dashboard/metrics<br>
+            GET /api/v1/dashboard/charts/*
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='dashboard/metrics') }}" class="btn">Test Dashboard API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>🔄 Status Workflow</h3>
+        <p>Complete anomaly approval and status workflow with prediction editing, user tracking, and approval management.</p>
+        <div class="code-block">
+            POST /api/v1/anomalies/&lt;id&gt;/approve<br>
+            PUT /api/v1/anomalies/&lt;id&gt;/status<br>
+            PUT /api/v1/anomalies/&lt;id&gt;/predictions
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='anomalies/1/status') }}" class="btn">Test Status Workflow</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>📁 Batch & Import</h3>
+        <p>Process multiple items at once with batch endpoints and file upload capabilities for CSV and Excel files.</p>
+        <div class="code-block">
+            POST /api/v1/anomalies/batch<br>
+            POST /api/v1/anomalies/upload<br>
+            POST /api/v1/import/anomalies
+        </div>
+        <a href="{{ url_for('browsable_api.test_endpoint', endpoint_path='anomalies/batch') }}" class="btn">Test Batch API</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>📋 API Documentation</h3>
+        <p>Browse all available endpoints with detailed documentation, parameter descriptions, and interactive testing forms.</p>
+        <a href="{{ url_for('browsable_api.endpoints') }}" class="btn">View All Endpoints</a>
+    </div>
+</div>
+
+<div class="welcome-card" style="margin-top: 2rem;">
+    <h3>🎯 API Features</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
+        <div>
+            <h4>✨ Key Features:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>✅ JWT Authentication</li>
+                <li>✅ User Registration & Profile Management</li>
+                <li>✅ Equipment Reliability Predictions</li>
+                <li>✅ Anomaly Management</li>
+                <li>✅ Maintenance Windows</li>
+                <li>✅ Action Plans & Tasks</li>
+                <li>✅ Dashboard & Reporting</li>
+                <li>✅ Status Workflow Management</li>
+                <li>✅ Batch Processing & Imports</li>
+                <li>✅ File Upload Support</li>
+                <li>✅ User Action Tracking</li>
+            </ul>
+        </div>
+        <div>
+            <h4>🔧 Technical Stack:</h4>
+            <ul style="list-style-type: none; padding-left: 0;">
+                <li>🐍 Flask + Flask-RESTful</li>
+                <li>🔐 Flask-JWT-Extended</li>
+                <li>🗄️ SQLAlchemy ORM</li>
+                <li>🧠 Scikit-learn ML Models</li>
+                <li>📊 Pandas for Data Processing</li>
+                <li>🌐 CORS Support</li>
+                <li>📝 Comprehensive Logging</li>
+                <li>🎨 DRF-style Browsable API</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

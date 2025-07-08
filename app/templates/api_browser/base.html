@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{ api_title }}</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+			background-color: #f8f9fa;
+			color: #212529;
+			line-height: 1.5;
+		}
+
+		.header {
+			background: linear-gradient(135deg, #007bff, #0056b3);
+			color: white;
+			padding: 1rem 0;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		}
+
+		.container {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 0 1rem;
+		}
+
+		.header-content {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.logo {
+			font-size: 1.5rem;
+			font-weight: bold;
+			text-decoration: none;
+			color: white;
+		}
+
+		.nav {
+			display: flex;
+			gap: 1rem;
+			align-items: center;
+		}
+
+		.nav a {
+			color: white;
+			text-decoration: none;
+			padding: 0.5rem 1rem;
+			border-radius: 4px;
+			transition: background 0.2s;
+		}
+
+		.nav a:hover {
+			background: rgba(255, 255, 255, 0.1);
+		}
+
+		.main {
+			max-width: 1200px;
+			margin: 2rem auto;
+			padding: 0 1rem;
+		}
+
+		.welcome-card {
+			background: white;
+			border-radius: 8px;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			padding: 2rem;
+			margin-bottom: 2rem;
+		}
+
+		.welcome-card h1 {
+			color: #007bff;
+			margin-bottom: 1rem;
+		}
+
+		.features {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+			gap: 1.5rem;
+			margin-top: 2rem;
+		}
+
+		.feature-card {
+			background: white;
+			border-radius: 8px;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			padding: 1.5rem;
+			border-left: 4px solid #007bff;
+		}
+
+		.feature-card h3 {
+			color: #007bff;
+			margin-bottom: 0.5rem;
+		}
+
+		.feature-card p {
+			color: #6c757d;
+			margin-bottom: 1rem;
+		}
+
+		.btn {
+			display: inline-block;
+			padding: 0.5rem 1rem;
+			background: #007bff;
+			color: white;
+			text-decoration: none;
+			border-radius: 4px;
+			border: none;
+			cursor: pointer;
+			transition: background 0.2s;
+		}
+
+		.btn:hover {
+			background: #0056b3;
+		}
+
+		.btn-secondary {
+			background: #6c757d;
+		}
+
+		.btn-secondary:hover {
+			background: #545b62;
+		}
+
+		.btn-success {
+			background: #28a745;
+		}
+
+		.btn-success:hover {
+			background: #1e7e34;
+		}
+
+		.alert {
+			padding: 0.75rem 1rem;
+			margin-bottom: 1rem;
+			border: 1px solid transparent;
+			border-radius: 4px;
+		}
+
+		.alert-success {
+			color: #155724;
+			background-color: #d4edda;
+			border-color: #c3e6cb;
+		}
+
+		.alert-error {
+			color: #721c24;
+			background-color: #f8d7da;
+			border-color: #f5c6cb;
+		}
+
+		.auth-status {
+			background: #e9ecef;
+			padding: 1rem;
+			border-radius: 4px;
+			margin-bottom: 1rem;
+		}
+
+		.auth-status.authenticated {
+			background: #d4edda;
+			color: #155724;
+		}
+
+		.quick-start {
+			background: #fff3cd;
+			border: 1px solid #ffeaa7;
+			padding: 1rem;
+			border-radius: 4px;
+			margin: 1rem 0;
+		}
+
+		.quick-start h4 {
+			color: #856404;
+			margin-bottom: 0.5rem;
+		}
+
+		.code-block {
+			background: #f8f9fa;
+			border: 1px solid #e9ecef;
+			border-radius: 4px;
+			padding: 1rem;
+			font-family: 'Monaco', 'Consolas', monospace;
+			font-size: 0.875rem;
+			overflow-x: auto;
+			margin: 0.5rem 0;
+		}
+	</style>
+</head>
+
+<body>
+	<header class="header">
+		<div class="container">
+			<div class="header-content">
+				<a href="{{ url_for('browsable_api.index') }}" class="logo">
+					🔧 {{ api_title }}
+				</a>
+				<nav class="nav">
+					<a href="{{ url_for('browsable_api.endpoints') }}">📋 API Endpoints</a>
+					{% if current_user %}
+					<span>👤 {{ current_user.username }}</span>
+					<a href="{{ url_for('browsable_api.logout') }}">🚪 Logout</a>
+					{% else %}
+					<a href="{{ url_for('browsable_api.login') }}">🔑 Login</a>
+					<a href="{{ url_for('browsable_api.register') }}">👥 Register</a>
+					{% endif %}
+				</nav>
+			</div>
+		</div>
+	</header>
+
+	<main class="main">
+		{% with messages = get_flashed_messages(with_categories=true) %}
+		{% if messages %}
+		{% for category, message in messages %}
+		<div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+			{{ message }}
+		</div>
+		{% endfor %}
+		{% endif %}
+		{% endwith %}
+
+		{% block content %}{% endblock %}
+	</main>
+</body>
+
+</html>
